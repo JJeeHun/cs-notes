@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import {
+  motion,
+  AnimatePresence,
+  useMotionValue,
+  useSpring,
+  useTransform,
+} from "motion/react";
 import { MindMapNode, PositionedNode } from "../types";
 import data from "../data.json";
 
@@ -17,32 +23,45 @@ interface MindMapProps {
 
 export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
   const [nodes, setNodes] = useState<PositionedNode[]>([]);
-  const [viewState, setViewState] = useState(() => {
-    const saved = sessionStorage.getItem("mindmap_view_state");
-    return saved ? JSON.parse(saved) : { x: 0, y: 0, scale: 1 };
-  });
+
+  // High performance motion values
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const scale = useMotionValue(1);
+
+  // Smooth springs for focus transitions
+  const springConfig = { damping: 25, stiffness: 120 };
+  const springX = useSpring(x, springConfig);
+  const springY = useSpring(y, springConfig);
+  const springScale = useSpring(scale, springConfig);
+
   const [isNavigating, setIsNavigating] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragStart = useRef({ x: 0, y: 0 });
 
+  // Initialize from session storage
+  useEffect(() => {
+    const saved = sessionStorage.getItem("mindmap_view_state");
+    if (saved) {
+      const { x: sx, y: sy, scale: ss } = JSON.parse(saved);
+      x.set(sx);
+      y.set(sy);
+      scale.set(ss);
+    }
+  }, []);
+
   // Handle Dragging (Mouse)
   const handleMouseDown = (e: React.MouseEvent) => {
     if (isNavigating) return;
     setIsDragging(true);
-    dragStart.current = {
-      x: e.clientX - viewState.x,
-      y: e.clientY - viewState.y,
-    };
+    dragStart.current = { x: e.clientX - x.get(), y: e.clientY - y.get() };
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
-    setViewState((prev) => ({
-      ...prev,
-      x: e.clientX - dragStart.current.x,
-      y: e.clientY - dragStart.current.y,
-    }));
+    x.set(e.clientX - dragStart.current.x);
+    y.set(e.clientY - dragStart.current.y);
   };
 
   // Handle Dragging (Touch)
@@ -51,33 +70,37 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
     setIsDragging(true);
     const touch = e.touches[0];
     dragStart.current = {
-      x: touch.clientX - viewState.x,
-      y: touch.clientY - viewState.y,
+      x: touch.clientX - x.get(),
+      y: touch.clientY - y.get(),
     };
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isDragging || e.touches.length !== 1) return;
     const touch = e.touches[0];
-    setViewState((prev) => ({
-      ...prev,
-      x: touch.clientX - dragStart.current.x,
-      y: touch.clientY - dragStart.current.y,
-    }));
+    x.set(touch.clientX - dragStart.current.x);
+    y.set(touch.clientY - dragStart.current.y);
   };
 
   const handleMouseUp = () => {
     setIsDragging(false);
+    // Save state periodically or on end
+    sessionStorage.setItem(
+      "mindmap_view_state",
+      JSON.stringify({
+        x: x.get(),
+        y: y.get(),
+        scale: scale.get(),
+      })
+    );
   };
 
   // Handle Zooming
   const handleWheel = (e: React.WheelEvent) => {
     if (isNavigating) return;
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setViewState((prev) => ({
-      ...prev,
-      scale: Math.min(Math.max(prev.scale * delta, 0.2), 5),
-    }));
+    const newScale = Math.min(Math.max(scale.get() * delta, 0.2), 5);
+    scale.set(newScale);
   };
 
   // Handle focus from sidebar
@@ -85,19 +108,12 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
     if (focusNodeId && nodes.length > 0) {
       const target = nodes.find((n) => n.id === focusNodeId);
       if (target) {
-        setViewState({
-          x: -target.x,
-          y: -target.y,
-          scale: 1.5,
-        });
+        x.set(-target.x);
+        y.set(-target.y);
+        scale.set(1.5);
       }
     }
   }, [focusNodeId, nodes]);
-
-  // Save view state when it changes
-  useEffect(() => {
-    sessionStorage.setItem("mindmap_view_state", JSON.stringify(viewState));
-  }, [viewState]);
 
   // Calculate positions for nodes
   useEffect(() => {
@@ -105,14 +121,20 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
 
     const calculatePositions = (
       node: MindMapNode,
-      x: number,
-      y: number,
+      nx: number,
+      ny: number,
       depth: number,
       angleStart: number,
       angleEnd: number,
       parentId?: string
     ) => {
-      const newNode: PositionedNode = { ...node, x, y, depth, parentId };
+      const newNode: PositionedNode = {
+        ...node,
+        x: nx,
+        y: ny,
+        depth,
+        parentId,
+      };
       positioned.push(newNode);
 
       if (node.children && node.children.length > 0) {
@@ -121,10 +143,9 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
 
         node.children.forEach((child, i) => {
           const angle = angleStart + angleStep * (i + 0.5);
-          const nextX = x + Math.cos(angle) * LEVEL_DISTANCE;
-          const nextY = y + Math.sin(angle) * LEVEL_DISTANCE;
+          const nextX = nx + Math.cos(angle) * LEVEL_DISTANCE;
+          const nextY = ny + Math.sin(angle) * LEVEL_DISTANCE;
 
-          // Narrow the angle range for children to keep it organic
           const childAngleRange = angleStep * 0.8;
           calculatePositions(
             child,
@@ -148,14 +169,12 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
 
     if (node.link) {
       setIsNavigating(true);
-      // Zoom into the node
-      setViewState({
-        x: -node.x * 3, // Multiplied by scale
-        y: -node.y * 3,
-        scale: 3,
-      });
 
-      // Redirect after animation
+      // Smoothly zoom in
+      x.set(-node.x * 3);
+      y.set(-node.y * 3);
+      scale.set(3);
+
       setTimeout(() => {
         if (node.link?.endsWith(".md")) {
           onNavigate("wiki", node.id, node.link);
@@ -168,12 +187,9 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
         setIsNavigating(false);
       }, 500);
     } else {
-      // Just center on the node if it's not a leaf
-      setViewState({
-        x: -node.x,
-        y: -node.y,
-        scale: 1.2,
-      });
+      x.set(-node.x);
+      y.set(-node.y);
+      scale.set(1.2);
     }
   };
 
@@ -218,19 +234,18 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
 
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <motion.div
-          className="relative pointer-events-auto"
-          animate={{
-            x: viewState.x,
-            y: viewState.y,
-            scale: viewState.scale,
+          className="relative pointer-events-auto will-change-transform"
+          style={{
+            x: springX,
+            y: springY,
+            scale: springScale,
           }}
-          transition={{ type: "spring", damping: 20, stiffness: 100 }}
         >
           {/* SVG Connections */}
           <svg className="absolute inset-0 overflow-visible pointer-events-none">
             <defs>
-              <filter id="glow">
-                <feGaussianBlur stdDeviation="2" result="coloredBlur" />
+              <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="1.5" result="coloredBlur" />
                 <feMerge>
                   <feMergeNode in="coloredBlur" />
                   <feMergeNode in="SourceGraphic" />
@@ -316,7 +331,11 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
       {/* Instructions Overlay */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4 pointer-events-none">
         <button
-          onClick={() => setViewState({ x: 0, y: 0, scale: 1 })}
+          onClick={() => {
+            x.set(0);
+            y.set(0);
+            scale.set(1);
+          }}
           className="pointer-events-auto px-4 py-2 bg-white/5 backdrop-blur-md border border-white/10 rounded-full text-[10px] text-white/40 hover:text-white hover:bg-white/10 transition-all tracking-[0.2em] uppercase"
         >
           Reset View
