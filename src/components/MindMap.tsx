@@ -10,7 +10,7 @@ import { MindMapNode, PositionedNode } from "../types";
 import data from "../data.json";
 
 const NODE_RADIUS = 60;
-const LEVEL_DISTANCE = 250;
+const LEVEL_DISTANCE = 200;
 
 interface MindMapProps {
   focusNodeId?: string;
@@ -35,8 +35,9 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
   const springY = useSpring(y, springConfig);
   const springScale = useSpring(scale, springConfig);
 
-  const [isNavigating, setIsNavigating] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
+  // Use refs instead of state to avoid re-renders on every click/drag
+  const isNavigating = useRef(false);
+  const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragStart = useRef({ x: 0, y: 0 });
 
@@ -53,21 +54,24 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
 
   // Handle Dragging (Mouse)
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (isNavigating) return;
-    setIsDragging(true);
+    if (isNavigating.current) return;
+    isDragging.current = true;
+    if (containerRef.current) {
+      containerRef.current.style.cursor = "grabbing";
+    }
     dragStart.current = { x: e.clientX - x.get(), y: e.clientY - y.get() };
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return;
+    if (!isDragging.current) return;
     x.set(e.clientX - dragStart.current.x);
     y.set(e.clientY - dragStart.current.y);
   };
 
   // Handle Dragging (Touch)
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (isNavigating || e.touches.length !== 1) return;
-    setIsDragging(true);
+    if (isNavigating.current || e.touches.length !== 1) return;
+    isDragging.current = true;
     const touch = e.touches[0];
     dragStart.current = {
       x: touch.clientX - x.get(),
@@ -76,14 +80,17 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging || e.touches.length !== 1) return;
+    if (!isDragging.current || e.touches.length !== 1) return;
     const touch = e.touches[0];
     x.set(touch.clientX - dragStart.current.x);
     y.set(touch.clientY - dragStart.current.y);
   };
 
   const handleMouseUp = () => {
-    setIsDragging(false);
+    isDragging.current = false;
+    if (containerRef.current) {
+      containerRef.current.style.cursor = "grab";
+    }
     // Save state periodically or on end
     sessionStorage.setItem(
       "mindmap_view_state",
@@ -97,7 +104,7 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
 
   // Handle Zooming
   const handleWheel = (e: React.WheelEvent) => {
-    if (isNavigating) return;
+    if (isNavigating.current) return;
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     const newScale = Math.min(Math.max(scale.get() * delta, 0.2), 5);
     scale.set(newScale);
@@ -165,10 +172,10 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
   }, []);
 
   const handleNodeClick = (node: PositionedNode) => {
-    if (isNavigating) return;
+    if (isNavigating.current) return;
 
     if (node.link) {
-      setIsNavigating(true);
+      isNavigating.current = true;
 
       // Smoothly zoom in
       x.set(-node.x * 3);
@@ -184,7 +191,7 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
         } else {
           window.location.href = node.link!;
         }
-        setIsNavigating(false);
+        isNavigating.current = false;
       }, 500);
     } else {
       x.set(-node.x);
@@ -222,9 +229,7 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
       onTouchMove={handleTouchMove}
       onTouchEnd={handleMouseUp}
       onWheel={handleWheel}
-      className={`relative w-full h-screen overflow-hidden bg-[#121212] transition-colors touch-none ${
-        isDragging ? "cursor-grabbing" : "cursor-grab"
-      }`}
+      className="relative w-full h-screen overflow-hidden bg-[#121212] transition-colors touch-none cursor-grab"
     >
       {/* Background Atmosphere */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
