@@ -1,0 +1,97 @@
+{
+  "id": "root",
+  "label": "Tech Wiki",
+  "color": "#A78BFA",
+  "children": [
+    {
+      "id": "java",
+      "label": "Java",
+      "color": "#F87171",
+      "children": [
+        {
+          "id": "java-framework",
+          "label": "Framework",
+          "color": "#FCA5A5",
+          "children": [
+            {
+              "id": "spring-boot",
+              "label": "Spring Boot",
+              "link": "/docs/spring-boot.md",
+              "color": "#FECACA"
+            },
+            {
+              "id": "spring-security",
+              "label": "Security",
+              "link": "component:SecurityWiki",
+              "color": "#FECACA"
+            }
+          ]
+        },
+        {
+          "id": "java-core",
+          "label": "Core",
+          "color": "#FCA5A5",
+          "children": [
+            {
+              "id": "socket",
+              "label": "Socket",
+              "link": "https://github.io/user/java-socket",
+              "color": "#FECACA"
+            },
+            {
+              "id": "nio",
+              "label": "NIO/AIO",
+              "link": "https://github.io/user/java-nio",
+              "color": "#FECACA"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "js-ts",
+      "label": "JS/TS",
+      "color": "#FBBF24",
+      "children": [
+        {
+          "id": "react",
+          "label": "React",
+          "link": "https://github.io/user/react",
+          "color": "#FDE68A"
+        },
+        {
+          "id": "node",
+          "label": "Node.js",
+          "link": "https://github.io/user/node",
+          "color": "#FDE68A"
+        }
+      ]
+    },
+    {
+      "id": "kotlin",
+      "label": "Kotlin",
+      "color": "#818CF8",
+      "children": [
+        {
+          "id": "coroutines",
+          "label": "Coroutines",
+          "link": "https://github.io/user/kotlin-coroutines",
+          "color": "#C7D2FE"
+        }
+      ]
+    },
+    {
+      "id": "dart",
+      "label": "Dart",
+      "color": "#2DD4BF",
+      "children": [
+        {
+          "id": "flutter",
+          "label": "Flutter",
+          "link": "https://github.io/user/flutter",
+          "color": "#99F6E4"
+        }
+      ]
+    }
+  ]
+}
