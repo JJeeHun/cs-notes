@@ -1,20 +1,24 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { MindMapNode, PositionedNode } from '../types';
-import data from '../data.json';
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { MindMapNode, PositionedNode } from "../types";
+import data from "../data.json";
 
 const NODE_RADIUS = 60;
 const LEVEL_DISTANCE = 250;
 
 interface MindMapProps {
   focusNodeId?: string;
-  onNavigate: (view: 'home' | 'mindmap' | 'wiki' | 'component', nodeId?: string, path?: string) => void;
+  onNavigate: (
+    view: "home" | "mindmap" | "wiki" | "component",
+    nodeId?: string,
+    path?: string
+  ) => void;
 }
 
 export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
   const [nodes, setNodes] = useState<PositionedNode[]>([]);
   const [viewState, setViewState] = useState(() => {
-    const saved = sessionStorage.getItem('mindmap_view_state');
+    const saved = sessionStorage.getItem("mindmap_view_state");
     return saved ? JSON.parse(saved) : { x: 0, y: 0, scale: 1 };
   });
   const [isNavigating, setIsNavigating] = useState(false);
@@ -22,19 +26,43 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragStart = useRef({ x: 0, y: 0 });
 
-  // Handle Dragging
+  // Handle Dragging (Mouse)
   const handleMouseDown = (e: React.MouseEvent) => {
     if (isNavigating) return;
     setIsDragging(true);
-    dragStart.current = { x: e.clientX - viewState.x, y: e.clientY - viewState.y };
+    dragStart.current = {
+      x: e.clientX - viewState.x,
+      y: e.clientY - viewState.y,
+    };
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
-    setViewState(prev => ({
+    setViewState((prev) => ({
       ...prev,
       x: e.clientX - dragStart.current.x,
       y: e.clientY - dragStart.current.y,
+    }));
+  };
+
+  // Handle Dragging (Touch)
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (isNavigating || e.touches.length !== 1) return;
+    setIsDragging(true);
+    const touch = e.touches[0];
+    dragStart.current = {
+      x: touch.clientX - viewState.x,
+      y: touch.clientY - viewState.y,
+    };
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging || e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    setViewState((prev) => ({
+      ...prev,
+      x: touch.clientX - dragStart.current.x,
+      y: touch.clientY - dragStart.current.y,
     }));
   };
 
@@ -46,7 +74,7 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
   const handleWheel = (e: React.WheelEvent) => {
     if (isNavigating) return;
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setViewState(prev => ({
+    setViewState((prev) => ({
       ...prev,
       scale: Math.min(Math.max(prev.scale * delta, 0.2), 5),
     }));
@@ -55,7 +83,7 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
   // Handle focus from sidebar
   useEffect(() => {
     if (focusNodeId && nodes.length > 0) {
-      const target = nodes.find(n => n.id === focusNodeId);
+      const target = nodes.find((n) => n.id === focusNodeId);
       if (target) {
         setViewState({
           x: -target.x,
@@ -68,13 +96,13 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
 
   // Save view state when it changes
   useEffect(() => {
-    sessionStorage.setItem('mindmap_view_state', JSON.stringify(viewState));
+    sessionStorage.setItem("mindmap_view_state", JSON.stringify(viewState));
   }, [viewState]);
 
   // Calculate positions for nodes
   useEffect(() => {
     const positioned: PositionedNode[] = [];
-    
+
     const calculatePositions = (
       node: MindMapNode,
       x: number,
@@ -90,12 +118,12 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
       if (node.children && node.children.length > 0) {
         const count = node.children.length;
         const angleStep = (angleEnd - angleStart) / count;
-        
+
         node.children.forEach((child, i) => {
           const angle = angleStart + angleStep * (i + 0.5);
           const nextX = x + Math.cos(angle) * LEVEL_DISTANCE;
           const nextY = y + Math.sin(angle) * LEVEL_DISTANCE;
-          
+
           // Narrow the angle range for children to keep it organic
           const childAngleRange = angleStep * 0.8;
           calculatePositions(
@@ -129,11 +157,11 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
 
       // Redirect after animation
       setTimeout(() => {
-        if (node.link?.endsWith('.md')) {
-          onNavigate('wiki', node.id, node.link);
-        } else if (node.link?.startsWith('component:')) {
-          const compName = node.link.replace('component:', '');
-          onNavigate('component', node.id, compName);
+        if (node.link?.endsWith(".md")) {
+          onNavigate("wiki", node.id, node.link);
+        } else if (node.link?.startsWith("component:")) {
+          const compName = node.link.replace("component:", "");
+          onNavigate("component", node.id, compName);
         } else {
           window.location.href = node.link!;
         }
@@ -161,22 +189,25 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
           y1: parent.y,
           x2: node.x,
           y2: node.y,
-          color: node.color || '#ffffff',
+          color: node.color || "#ffffff",
         };
       })
       .filter(Boolean);
   }, [nodes]);
 
   return (
-    <div 
+    <div
       ref={containerRef}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleMouseUp}
       onWheel={handleWheel}
-      className={`relative w-full h-screen overflow-hidden bg-[#121212] transition-colors ${
-        isDragging ? 'cursor-grabbing' : 'cursor-grab'
+      className={`relative w-full h-screen overflow-hidden bg-[#121212] transition-colors touch-none ${
+        isDragging ? "cursor-grabbing" : "cursor-grab"
       }`}
     >
       {/* Background Atmosphere */}
@@ -193,7 +224,7 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
             y: viewState.y,
             scale: viewState.scale,
           }}
-          transition={{ type: 'spring', damping: 20, stiffness: 100 }}
+          transition={{ type: "spring", damping: 20, stiffness: 100 }}
         >
           {/* SVG Connections */}
           <svg className="absolute inset-0 overflow-visible pointer-events-none">
@@ -212,7 +243,11 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
                 initial={{ pathLength: 0, opacity: 0 }}
                 animate={{ pathLength: 1, opacity: 0.3 }}
                 transition={{ duration: 1.5, ease: "easeInOut" }}
-                d={`M ${conn!.x1} ${conn!.y1} C ${(conn!.x1 + conn!.x2) / 2} ${conn!.y1}, ${(conn!.x1 + conn!.x2) / 2} ${conn!.y2}, ${conn!.x2} ${conn!.y2}`}
+                d={`M ${conn!.x1} ${conn!.y1} C ${(conn!.x1 + conn!.x2) / 2} ${
+                  conn!.y1
+                }, ${(conn!.x1 + conn!.x2) / 2} ${conn!.y2}, ${conn!.x2} ${
+                  conn!.y2
+                }`}
                 stroke={conn!.color}
                 strokeWidth="2"
                 fill="none"
@@ -226,16 +261,16 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
             {nodes.map((node) => (
               <motion.div
                 key={node.id}
-                initial={{ scale: 0, opacity: 0, x: '-50%', y: '-32px' }}
-                animate={{ scale: 1, opacity: 1, x: '-50%', y: '-32px' }}
-                transition={{ 
+                initial={{ scale: 0, opacity: 0, x: "-50%", y: "-32px" }}
+                animate={{ scale: 1, opacity: 1, x: "-50%", y: "-32px" }}
+                transition={{
                   delay: node.depth * 0.1,
-                  type: 'spring',
+                  type: "spring",
                   damping: 12,
-                  stiffness: 100 
+                  stiffness: 100,
                 }}
                 style={{
-                  position: 'absolute',
+                  position: "absolute",
                   left: node.x,
                   top: node.y,
                 }}
@@ -246,17 +281,17 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
                   className="relative flex flex-col items-center justify-center cursor-pointer"
                 >
                   {/* Glow Effect */}
-                  <div 
+                  <div
                     className="absolute inset-0 rounded-full blur-xl opacity-20 group-hover:opacity-40 transition-opacity"
                     style={{ backgroundColor: node.color }}
                   />
-                  
+
                   {/* Node Circle */}
-                  <div 
+                  <div
                     className="w-16 h-16 rounded-full border-2 flex items-center justify-center bg-[#1a1a1a] transition-all duration-300 group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(255,255,255,0.1)]"
                     style={{ borderColor: node.color }}
                   >
-                    <div 
+                    <div
                       className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: node.color }}
                     />
@@ -280,7 +315,7 @@ export default function MindMap({ focusNodeId, onNavigate }: MindMapProps) {
 
       {/* Instructions Overlay */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-4 pointer-events-none">
-        <button 
+        <button
           onClick={() => setViewState({ x: 0, y: 0, scale: 1 })}
           className="pointer-events-auto px-4 py-2 bg-white/5 backdrop-blur-md border border-white/10 rounded-full text-[10px] text-white/40 hover:text-white hover:bg-white/10 transition-all tracking-[0.2em] uppercase"
         >

@@ -16,7 +16,7 @@
             {
               "id": "spring-boot",
               "label": "Spring Boot",
-              "link": "/cs-notes/docs/spring-boot.md",
+              "link": "/docs/spring-boot.md",
               "color": "#FECACA"
             },
             {
